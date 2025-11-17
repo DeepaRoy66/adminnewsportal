@@ -1,95 +1,65 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Check, AlertCircle } from "lucide-react";
 
 export default function NewsForm({ category, subcategories = [] }) {
-  // ---- Hooks must stay at the top (order must never change) ----
-  const [isMounted, setIsMounted] = useState(false);
-
+  // ---------------- Hooks ----------------
   const [formData, setFormData] = useState({
     title: "",
     subcategory: subcategories[0] || "",
     content: "",
   });
 
-  const [articles, setArticles] = useState([]);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("");
+  const [messageType, setMessageType] = useState(""); // success | error
 
-  // Mark client mount
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Load articles only AFTER mounted (because localStorage)
-  useEffect(() => {
-    if (!isMounted) return;
-
-    try {
-      const stored = localStorage.getItem(`news_${category}`);
-      if (stored) {
-        setArticles(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error("Error loading articles:", error);
-    }
-  }, [isMounted, category]);
-
-  // ---- If not mounted, return lightweight placeholder (same DOM always) ----
-  if (!isMounted) {
-    return (
-      <div className="max-w-3xl">
-        <div className="bg-white rounded-lg border border-gray-200 p-8 opacity-0">
-          Loading...
-        </div>
-      </div>
-    );
-  }
-
-  const handleSubmit = (e) => {
+  // ---------------- Submit Handler ----------------
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.title.trim() || !formData.content.trim()) {
       setMessage("Please fill in all fields");
       setMessageType("error");
-      setTimeout(() => setMessage(""), 3000);
       return;
     }
 
-    const newArticle = {
-      id: Date.now().toString(),
-      title: formData.title,
-      category,
-      subcategory: formData.subcategory,
-      content: formData.content,
-      date: new Date().toISOString(),
-    };
-
     try {
-      const stored = localStorage.getItem(`news_${category}`);
-      const currentArticles = stored ? JSON.parse(stored) : [];
-      const updated = [newArticle, ...currentArticles];
-      localStorage.setItem(`news_${category}`, JSON.stringify(updated));
-
-      setArticles(updated);
-      setFormData({
-        title: "",
-        subcategory: subcategories[0] || "",
-        content: "",
+      const res = await fetch("/api/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formData.title,
+          category,
+          subcategory: formData.subcategory,
+          content: formData.content,
+        }),
       });
 
-      setMessage("Article posted successfully!");
-      setMessageType("success");
-      setTimeout(() => setMessage(""), 3000);
-    } catch (error) {
-      console.error("Error saving article:", error);
-      setMessage("Error posting article");
+      const data = await res.json();
+
+      if (data.success) {
+        setMessage("Article posted successfully!");
+        setMessageType("success");
+
+        setFormData({
+          title: "",
+          subcategory: subcategories[0] || "",
+          content: "",
+        });
+      } else {
+        setMessage("Failed to post article");
+        setMessageType("error");
+      }
+    } catch (err) {
+      setMessage("Server error while posting article");
       setMessageType("error");
-      setTimeout(() => setMessage(""), 3000);
     }
+
+    setTimeout(() => setMessage(""), 3000);
   };
 
+  // ---------------- UI ----------------
   return (
     <div className="max-w-3xl">
       <div className="bg-white rounded-lg border border-gray-200 p-8">
@@ -115,6 +85,7 @@ export default function NewsForm({ category, subcategories = [] }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Title */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Title
@@ -126,10 +97,11 @@ export default function NewsForm({ category, subcategories = [] }) {
                 setFormData({ ...formData, title: e.target.value })
               }
               placeholder="Enter article title"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             />
           </div>
 
+          {/* Subcategory */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Subcategory
@@ -139,7 +111,7 @@ export default function NewsForm({ category, subcategories = [] }) {
               onChange={(e) =>
                 setFormData({ ...formData, subcategory: e.target.value })
               }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
               {subcategories.map((sub) => (
                 <option key={sub} value={sub}>
@@ -149,6 +121,7 @@ export default function NewsForm({ category, subcategories = [] }) {
             </select>
           </div>
 
+          {/* Content */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Content
@@ -160,13 +133,14 @@ export default function NewsForm({ category, subcategories = [] }) {
               }
               placeholder="Write your article content here..."
               rows={10}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 resize-none"
             />
           </div>
 
+          {/* Submit */}
           <button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition"
           >
             Post Article
           </button>

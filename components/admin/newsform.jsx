@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { Check, AlertCircle } from "lucide-react";
 
-export default function NewsForm({ category, subcategories }) {
+export default function NewsForm({ category, subcategories = [] }) {
+  // ---- Hooks must stay at the top (order must never change) ----
+  const [isMounted, setIsMounted] = useState(false);
+
   const [formData, setFormData] = useState({
     title: "",
     subcategory: subcategories[0] || "",
@@ -14,11 +17,15 @@ export default function NewsForm({ category, subcategories }) {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
 
+  // Mark client mount
   useEffect(() => {
-    loadArticles();
-  }, [category]);
+    setIsMounted(true);
+  }, []);
 
-  const loadArticles = () => {
+  // Load articles only AFTER mounted (because localStorage)
+  useEffect(() => {
+    if (!isMounted) return;
+
     try {
       const stored = localStorage.getItem(`news_${category}`);
       if (stored) {
@@ -27,7 +34,18 @@ export default function NewsForm({ category, subcategories }) {
     } catch (error) {
       console.error("Error loading articles:", error);
     }
-  };
+  }, [isMounted, category]);
+
+  // ---- If not mounted, return lightweight placeholder (same DOM always) ----
+  if (!isMounted) {
+    return (
+      <div className="max-w-3xl">
+        <div className="bg-white rounded-lg border border-gray-200 p-8 opacity-0">
+          Loading...
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -42,7 +60,7 @@ export default function NewsForm({ category, subcategories }) {
     const newArticle = {
       id: Date.now().toString(),
       title: formData.title,
-      category: category,
+      category,
       subcategory: formData.subcategory,
       content: formData.content,
       date: new Date().toISOString(),
@@ -55,7 +73,11 @@ export default function NewsForm({ category, subcategories }) {
       localStorage.setItem(`news_${category}`, JSON.stringify(updated));
 
       setArticles(updated);
-      setFormData({ title: "", subcategory: subcategories[0] || "", content: "" });
+      setFormData({
+        title: "",
+        subcategory: subcategories[0] || "",
+        content: "",
+      });
 
       setMessage("Article posted successfully!");
       setMessageType("success");
@@ -93,7 +115,6 @@ export default function NewsForm({ category, subcategories }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Title
@@ -109,7 +130,6 @@ export default function NewsForm({ category, subcategories }) {
             />
           </div>
 
-          {/* Subcategory */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Subcategory
@@ -129,7 +149,6 @@ export default function NewsForm({ category, subcategories }) {
             </select>
           </div>
 
-          {/* Content */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Content
@@ -145,7 +164,6 @@ export default function NewsForm({ category, subcategories }) {
             />
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
